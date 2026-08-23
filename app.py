@@ -301,7 +301,9 @@ def combine_signals(model_verdict, red_flags, rule_flags):
     """
     if model_verdict == 'FRAUDULENT':
         return 'DANGER'
-    if rule_flags or red_flags:
+
+    hedge_flags = [f for f in red_flags if f.lower().startswith('worth verifying')]
+    if rule_flags or hedge_flags:
         return 'CAUTION'
     if model_verdict == 'UNPARSEABLE':
         return 'CAUTION'
