@@ -32,7 +32,7 @@ st.set_page_config(
 
 
 def set_background(image_path):
-    """Set the app's background image via injected CSS.
+    """Set the app's background image and float the content in a white card.
 
     Args:
         image_path (str): Path to the background image file.
@@ -43,17 +43,25 @@ def set_background(image_path):
     st.markdown(f'''
         <style>
         [data-testid="stAppViewContainer"] {{
-            background-image: linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.45)),
-                url("data:image/jpeg;base64,{encoded}");
+            background-image: url("data:image/png;base64,{encoded}");
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
+        }}
+        [data-testid="stAppViewContainer"] .main .block-container,
+        [data-testid="stMainBlockContainer"] {{
+            background-color: rgba(255, 255, 255, 0.96);
+            border-radius: 12px;
+            padding: 2rem 2.5rem;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
         }}
         </style>
     ''', unsafe_allow_html=True)
 
 
-set_background('background2.jpg')
+set_background('background3.png')
 
 
 @st.cache_resource(show_spinner='Loading the fine-tuned model...')
