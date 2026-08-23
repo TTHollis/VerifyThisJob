@@ -1,4 +1,5 @@
 # Loading Libraries/imports
+import base64
 import re
 
 import streamlit as st
@@ -12,8 +13,7 @@ FOREST_GREEN = '#228B22'
 AMBER = '#E69F00'
 DARK_GRAY = '#333333'
 
-# Run configuration - mirrors the fine-tuning notebook's SYSTEM_PROMPT and
-# MAX_LENGTH exactly, so inference behaves the same way it did during evaluation
+# Run configuration
 MODEL_PATH = 'TH69426a/emscad-fraud-ft-final'  # public Hugging Face Hub repo
 MAX_LENGTH = 1024
 MAX_NEW_TOKENS = 180
@@ -31,13 +31,34 @@ st.set_page_config(
 )
 
 
+def set_background(image_path):
+    """Set the app's background image via injected CSS.
+
+    Args:
+        image_path (str): Path to the background image file.
+    """
+    with open(image_path, 'rb') as f:
+        encoded = base64.b64encode(f.read()).decode()
+
+    st.markdown(f'''
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background-image: linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)),
+                url("data:image/jpeg;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+        </style>
+    ''', unsafe_allow_html=True)
+
+
+set_background('background2.jpg')
+
+
 @st.cache_resource(show_spinner='Loading the fine-tuned model...')
 def load_model():
     """Load the fine-tuned model and tokenizer once per app session.
-
-    Streamlit reruns the whole script on every interaction, so this is
-    cached with st.cache_resource - the same model stays in memory across
-    button clicks instead of reloading from the Hub each time.
 
     Returns:
         tuple: (model, tokenizer), tokenizer padded on the left for generation.
@@ -84,11 +105,6 @@ def parse_confidence(text):
 def check_grounding(text, posting):
     """Flag which quoted phrases in the response do not appear in the posting.
 
-    Every quote the fine-tune was trained to produce was lifted directly from
-    the posting text, so a quote the posting does not contain is a
-    fabricated citation rather than real evidence - the same check used to
-    audit the model in Milestone 3.
-
     Args:
         text (str): The generated response.
         posting (str): The posting the response describes.
@@ -120,10 +136,6 @@ def extract_red_flags(text):
 def generate_response(model, tokenizer, posting_text):
     """Generate a fraud verdict and explanation for one job posting.
 
-    Mirrors the greedy-decoding generation used to evaluate the model in
-    Milestone 3 (same chat template, same SYSTEM_PROMPT, same do_sample=False),
-    scaled down from a batch of postings to a single one pasted by a user.
-
     Args:
         model: The loaded fine-tuned model.
         tokenizer: The model's tokenizer, padded on the left.
@@ -151,13 +163,7 @@ def generate_response(model, tokenizer, posting_text):
         generated[0][prompt_length:], skip_special_tokens=True)
 
 
-# Rule-based screening - a second, independent check that runs alongside the
-# fine-tuned model. The model can only recognize patterns it saw in EMSCAD's
-# 2012-2014 training data; this scan looks for scam vocabulary directly,
-# including a newer coaching/consultation-fee pattern the model was never
-# trained on, so the two checks fail in different places instead of sharing
-# the same blind spot. Vocabulary below extends the categories built for
-# Milestone 3's training labels.
+# Rule-based screening
 MONEY_TERMS = ('registration fee', 'start-up fee', 'startup fee',
                'processing fee', 'wire transfer', 'western union',
                'money order', 'bank account', 'social security number',
@@ -168,9 +174,6 @@ PAY_TERMS = ('guaranteed income', 'guarantee wages', 'no experience needed',
 URGENCY_TERMS = ('act now', 'apply immediately', 'limited time',
                   'immediate start', 'positions filling fast', 'hurry',
                   'start today')
-# Newer pattern, added after the model missed a modern coaching-funnel
-# posting in testing: a fee attached to a "call" or "session" framed as a
-# step toward the job, rather than a wire transfer or processing fee
 UPSELL_TERMS = ('strategy call', 'strategy session', 'consultation call',
                  'consultation fee', 'clarity call', 'discovery call',
                  'discovery session', 'coaching call', 'coaching fee',
@@ -196,12 +199,6 @@ def quote_list(items, limit=2):
 
 def screen_posting_rules(text):
     """Scan raw posting text for known scam vocabulary, independent of the model.
-
-    This does not rely on the model's judgment at all, so it catches
-    vocabulary the model was never trained to recognize - the same
-    consultation-fee pattern that slipped past the fine-tuned model in
-    testing, since that phrasing never appeared in EMSCAD's 2012-2014
-    postings.
 
     Args:
         text (str): Raw job posting text as pasted by the user.
@@ -249,12 +246,6 @@ def screen_posting_rules(text):
 def combine_signals(model_verdict, rule_flags):
     """Combine the model's verdict with the independent rule-based scan.
 
-    The model and the rule-based scan have different blind spots, so this
-    resolves conservatively: any signal of risk from either one wins over a
-    clean result from the other, in line with the recall-first philosophy
-    carried through this project since DSC630 - missing a real scam costs a
-    job seeker far more than a false alarm costs a second look.
-
     Args:
         model_verdict (str): 'FRAUDULENT', 'LEGITIMATE', or 'UNPARSEABLE'.
         rule_flags (list): Flags returned by screen_posting_rules.
@@ -271,8 +262,7 @@ def combine_signals(model_verdict, rule_flags):
     return 'CLEAR'
 
 
-# Example postings a user can load with one click - one obvious fraud
-# pattern, one ordinary legitimate posting, for quick demoing
+# Example postings
 EXAMPLE_POSTINGS = {
     'Select an example...': '',
     'Suspicious: Data Entry Clerk': (
@@ -323,7 +313,8 @@ with st.expander('About this tool and its limitations'):
 This tool runs a full fine-tune of `{MODEL_PATH.split('/')[-1]}`
 (base model Qwen2.5-0.5B-Instruct), trained on the EMSCAD job posting
 dataset (Vidros et al., 2017) to classify postings and cite the specific
-red flags behind each verdict.
+red flags behind each verdict, it also uses independent and more recent
+scam pattern terminology to catch anything the model may have missed.
 
 **On 441 held-out postings never seen during training:** fraud recall
 0.878, fraud precision 0.843, F1 0.860, 100% format compliance.
