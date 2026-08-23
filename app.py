@@ -124,6 +124,43 @@ def check_grounding(text, posting):
     lowered = posting.lower()
     return [q for q in quotes if q.lower() not in lowered]
 
+# Verify if missing information is actually missing
+EMPLOYER_LABEL_RE = re.compile(
+    r'(?:company(?: profile| name)?|employer|organization)\s*:\s*(\S.{5,})',
+    re.IGNORECASE)
+REQUIREMENTS_LABEL_RE = re.compile(
+    r'(?:requirements?|qualifications?|duties|responsibilities)\s*:\s*(\S.{15,})',
+    re.IGNORECASE)
+MISSING_EMPLOYER_PHRASES = ('never names', 'never describes the employer',
+                             'does not name', 'does not describe the employer')
+MISSING_REQUIREMENTS_PHRASES = ('no qualifications', 'not listed',
+                                 'unclear what the work involves',
+                                 'not part of the job req')
+
+
+def check_claim_consistency(red_flags, posting_text):
+    """Flag red-flag bullets that claim something is missing when it isn't.
+
+    Args:
+        red_flags (list): Flags extracted from the model's response.
+        posting_text (str): The posting text the flags describe.
+
+    Returns:
+        list: Red-flag bullets whose "missing" claim looks contradicted.
+    """
+    has_employer = bool(EMPLOYER_LABEL_RE.search(posting_text))
+    has_requirements = bool(REQUIREMENTS_LABEL_RE.search(posting_text))
+
+    contradicted = []
+    for flag in red_flags:
+        lowered = flag.lower()
+        if has_employer and any(p in lowered for p in MISSING_EMPLOYER_PHRASES):
+            contradicted.append(flag)
+        elif has_requirements and any(
+                p in lowered for p in MISSING_REQUIREMENTS_PHRASES):
+            contradicted.append(flag)
+
+    return contradicted
 
 def extract_red_flags(text):
     """Pull the bullet lines listed under RED FLAGS: out of a response.
@@ -251,11 +288,12 @@ def screen_posting_rules(text):
     return flags
 
 
-def combine_signals(model_verdict, rule_flags):
-    """Combine the model's verdict with the independent rule-based scan.
+def combine_signals(model_verdict, red_flags, rule_flags):
+    """Combine the model's verdict with its own red flags and the rule scan.
 
     Args:
         model_verdict (str): 'FRAUDULENT', 'LEGITIMATE', or 'UNPARSEABLE'.
+        red_flags (list): Flags extracted from the model's own response.
         rule_flags (list): Flags returned by screen_posting_rules.
 
     Returns:
@@ -263,7 +301,7 @@ def combine_signals(model_verdict, rule_flags):
     """
     if model_verdict == 'FRAUDULENT':
         return 'DANGER'
-    if rule_flags:
+    if rule_flags or red_flags:
         return 'CAUTION'
     if model_verdict == 'UNPARSEABLE':
         return 'CAUTION'
@@ -362,8 +400,9 @@ if analyze_clicked:
         confidence = parse_confidence(response)
         red_flags = extract_red_flags(response)
         fabricated = check_grounding(response, posting_text)
+        contradicted = check_claim_consistency(red_flags, posting_text)
         rule_flags = screen_posting_rules(posting_text)
-        overall = combine_signals(verdict, rule_flags)
+        overall = combine_signals(verdict, red_flags, rule_flags)
 
         st.subheader('Result')
         if overall == 'DANGER':
@@ -376,12 +415,18 @@ if analyze_clicked:
                     '⚠️ Caution - the model could not produce a '
                     'clear verdict for this posting. Read the raw output '
                     'below and use your own judgment.')
-            else:
+            elif rule_flags:
                 st.warning(
                     f'⚠️ Caution - the model called this posting '
                     f'{verdict} (confidence: {confidence}), but an '
                     f'independent rule-based check found signals it may '
                     f'have missed. Review before proceeding.')
+            else:
+                st.warning(
+                    f'⚠️ Caution - the model called this posting '
+                    f'{verdict} (confidence: {confidence}), but it noted '
+                    f'its own details worth verifying below. Review before '
+                    f'proceeding.')
         else:
             st.success(
                 f'✅ No red flags detected (model verdict: {verdict}, '
@@ -406,6 +451,12 @@ if analyze_clicked:
                 f'⚠️ {len(fabricated)} quoted phrase(s) above could '
                 f'not be verified against the posting text and may be '
                 f'fabricated: {"; ".join(fabricated)}')
+        if contradicted:
+            st.caption(
+                f'⚠️ {len(contradicted)} red flag(s) above claim '
+                f'something is missing from the posting that appears to '
+                f'actually be present - the model may have hallucinated '
+                f'this claim rather than checked the text.')
 
         with st.expander('Raw model output'):
             st.text(response)
