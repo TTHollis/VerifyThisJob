@@ -325,19 +325,21 @@ EXAMPLE_POSTINGS = {
         'and ship your equipment.\n'
         'Benefits: Flexible hours, unlimited income potential'
     ),
-    'Ordinary: Staff Accountant': (
-        'Title: Staff Accountant\n'
-        'Location: Columbus, OH\n'
-        'Company profile: Founded in 1998, Meridian Manufacturing is a '
-        'family-owned industrial parts supplier with 140 employees across '
-        'two facilities.\n'
-        'Description: We are hiring a Staff Accountant to manage accounts '
-        'payable, assist with month-end close, and support the '
-        'Controller during the annual audit. This is an in-office role '
-        'reporting to the Finance Director.\n'
-        'Requirements: Bachelor\'s degree in Accounting, 2+ years of '
-        'experience, proficiency in QuickBooks and Excel.\n'
-        'Benefits: Health insurance, 401(k) match, paid time off'
+        'Ordinary: Graphic Designer': (
+        'Title: Graphic Designer\n'
+        'Location: Denver, CO\n'
+        'Company profile: Bright Path Design Studio has served regional '
+        'retail clients since 2011, with a team of 12 full-time '
+        'designers.\n'
+        'Description: We\'re looking for a Graphic Designer to develop '
+        'print and digital campaigns for local retail clients under the '
+        'direction of our Creative Director. This is a full-time, '
+        'in-office position.\n'
+        'Requirements: Portfolio required, 3+ years of experience with '
+        'Adobe Creative Suite, bachelor\'s degree preferred but not '
+        'required.\n'
+        'Benefits: Health insurance, dental, paid holidays, professional '
+        'development stipend'
     ),
 }
 
