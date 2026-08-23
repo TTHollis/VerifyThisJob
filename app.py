@@ -43,7 +43,7 @@ def set_background(image_path):
     st.markdown(f'''
         <style>
         [data-testid="stAppViewContainer"] {{
-            background-image: linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)),
+            background-image: linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.45)),
                 url("data:image/jpeg;base64,{encoded}");
             background-size: cover;
             background-position: center;
