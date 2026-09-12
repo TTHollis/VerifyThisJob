@@ -61,7 +61,7 @@ def set_background(image_path):
     ''', unsafe_allow_html=True)
 
 
-set_background('background3.png')
+set_background('assets/background3.png')
 
 
 @st.cache_resource(show_spinner='Loading the fine-tuned model...')
