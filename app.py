@@ -25,7 +25,7 @@ SYSTEM_PROMPT = (
 )
 
 st.set_page_config(
-    page_title='Job Posting Fraud Detector',
+    page_title='Verify This Job',
     page_icon='\U0001F575',
     layout='centered',
 )
@@ -345,7 +345,7 @@ EXAMPLE_POSTINGS = {
 
 
 # Main app layout
-st.title('\U0001F575 Job Posting Fraud Detector')
+st.title('\U0001F575 Verify This Job')
 st.write(
     'Paste a job posting below and this tool will flag whether it looks '
     'fraudulent and explain, in plain language, which specific details '
