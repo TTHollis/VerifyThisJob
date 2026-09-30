@@ -6,6 +6,8 @@ import streamlit as st
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from archetype_screen import screen_archetype
+
 # Colorblind-safe project palette (carried over from Milestone 3)
 ROYAL_BLUE = '#4169E1'
 PURPLE = '#4B0082'
@@ -288,26 +290,51 @@ def screen_posting_rules(text):
     return flags
 
 
-def combine_signals(model_verdict, red_flags, rule_flags):
-    """Combine the model's verdict with its own red flags and the rule scan.
+def combine_signals(model_verdict, red_flags, rule_flags, archetype=None):
+    """Combine the model's verdict with its red flags, the rule scan and the shape check.
+
+    A campaign phrase match escalates to DANGER on its own, overriding a
+    LEGITIMATE model verdict. Those phrases identified 99 postings with no
+    false positives in the source study, and the same study found that a
+    supervised model catches only 14.1% of a campaign it has not been trained
+    on, which is exactly the gap this signal exists to close.
+
+    A structural shape match only ever raises CAUTION. Short legitimate
+    postings can carry that shape, so it is a reason to look closer.
 
     Args:
         model_verdict (str): 'FRAUDULENT', 'LEGITIMATE', or 'UNPARSEABLE'.
         red_flags (list): Flags extracted from the model's own response.
         rule_flags (list): Flags returned by screen_posting_rules.
+        archetype (dict): Result from screen_archetype, or None.
 
     Returns:
         str: 'DANGER', 'CAUTION', or 'CLEAR'.
     """
+    if archetype and archetype.get('basis') == 'campaign phrase':
+        return 'DANGER'
     if model_verdict == 'FRAUDULENT':
         return 'DANGER'
 
     hedge_flags = [f for f in red_flags if f.lower().startswith('worth verifying')]
     if rule_flags or hedge_flags:
         return 'CAUTION'
+    if archetype and archetype.get('shape'):
+        return 'CAUTION'
     if model_verdict == 'UNPARSEABLE':
         return 'CAUTION'
     return 'CLEAR'
+
+
+def md_safe(text):
+    """Escape dollar signs so Streamlit does not read them as math delimiters.
+
+    Streamlit renders markdown with KaTeX enabled, so two dollar signs on one
+    line open and close an inline math span. A pay range such as $600 to
+    $4,500 renders its first figure in a serif math font and the rest in body
+    text. Apply this to any string built from posting text or model output.
+    """
+    return str(text).replace('$', r'\$')
 
 
 # Example postings
@@ -347,39 +374,59 @@ EXAMPLE_POSTINGS = {
 # Main app layout
 st.title('\U0001F575 Verify This Job')
 st.write(
-    'Paste a job posting below and this tool will flag whether it looks '
-    'fraudulent and explain, in plain language, which specific details '
-    'triggered that call.'
+    'Paste a job posting below and this tool will tell you whether it looks '
+    'like a scam, and which specific details led it there.'
 )
 st.warning(
-    'This is a research prototype, not a certified fraud determination. '
-    'On 441 held-out test postings the fine-tuned model caught 87.8% of '
-    'fraud and missed the rest, so results here are a first-pass screening '
-    'aid - use your own judgment alongside them, especially on a result '
-    'marked CAUTION below.')
+    'This is a research project, not an official fraud check. In testing it '
+    'caught about seven of every eight scam postings, which means it misses '
+    'some. Use it as a second opinion rather than a final answer, especially '
+    'when the result says caution.')
 
-with st.expander('About this tool and its limitations'):
+with st.expander('How this works, and where it falls short'):
     st.markdown(f'''
-This tool runs a full fine-tune of `{MODEL_PATH.split('/')[-1]}`
-(base model Qwen2.5-0.5B-Instruct), trained on the EMSCAD job posting
-dataset (Vidros et al., 2017) to classify postings and cite the specific
-red flags behind each verdict, it also uses independent and more recent
-scam pattern terminology to catch anything the model may have missed.
+Two things read your posting.
 
-**On 441 held-out postings never seen during training:** fraud recall
-0.878, fraud precision 0.843, F1 0.860, 100% format compliance.
+The first learned what scam postings sound like from about 18,000 real job
+ads, roughly 800 of them confirmed scams, collected and published by
+researchers (Vidros et al., 2017). The second is a separate check for
+specific shapes that scam postings tend to take, found by studying that
+same collection. The second one needs no model at all, so it answers
+immediately while the first is still starting up.
 
-**Known limitation:** the model fabricates citations at a measurable rate
-(about 13% of quoted phrases in evaluation were not actually present in
-the source posting). This app checks every quote against the pasted
-posting and flags anything it cannot verify - treat an unverified quote
-as the model's error, not evidence.
+**How well it does.** Tested on 441 postings it had never seen before, it
+caught about seven of every eight scams. When it called something a scam,
+it was right about five times out of six. Those numbers come from a fixed
+research collection rather than from live job boards, so read them as a
+rough sense of how far to trust it, not a promise.
 
-This tool is biased toward flagging anything questionable rather than
-staying quiet, on the theory that missing a real scam costs a job seeker
-far more than a false alarm costs a second look. A LEGITIMATE verdict is
-not a guarantee, and a FRAUDULENT verdict is not a certainty - read the
-listed red flags and judge for yourself.
+**Something to watch for.** The model sometimes quotes wording the posting
+never actually used, in testing about one quote in every eight. This app
+checks every quote against what you pasted and marks any it cannot find.
+A quote marked unverified is the model's mistake, not something the
+posting said.
+
+**Which way it leans.** It is built to speak up rather than stay quiet,
+because missing a real scam costs a job seeker far more than a false alarm
+costs a second look. A clean result is not a guarantee, and a scam result
+is not proof. Read the reasons it gives and decide for yourself.
+
+The postings used to build this were collected between 2012 and 2014.
+Scam wording moves, so an exact phrase match is strong evidence, while no
+match tells you nothing at all.
+
+---
+
+**Technical details.** Full fine-tune of `{MODEL_PATH.split('/')[-1]}`
+(base: Qwen2.5-0.5B-Instruct) on the EMSCAD corpus (Vidros et al., 2017),
+trained to classify postings and cite the red flags behind each verdict.
+Held-out evaluation on 441 postings: fraud recall 0.878, fraud precision
+0.843, F1 0.860, 100% format compliance. Quote fabrication rate
+approximately 13%. The pattern check is an independent module carrying no
+model, derived from an unsupervised clustering study of the same corpus
+([Scam Signatures](https://github.com/TTHollis/DataSciencePortfolio/tree/main/projects/ScamSignatures));
+an exact campaign phrase match sets the result on its own, a structural
+match only ever raises a caution.
 ''')
 
 example_choice = st.selectbox(
@@ -396,6 +443,29 @@ if analyze_clicked:
     if not posting_text.strip():
         st.warning('Paste a job posting first.')
     else:
+        archetype = screen_archetype(posting_text)
+
+        st.subheader('Known pattern check')
+        if archetype['shape']:
+            st.markdown(f"This posting matches **{archetype['shape']}**, "
+                        f"identified by {archetype['basis']}.")
+            st.markdown(f"_{archetype['explanation']}_")
+            st.markdown('**Why it matched:**')
+            for item in archetype['evidence']:
+                st.markdown(f'- {md_safe(item)}')
+            ref = archetype['reference']
+            st.markdown(
+                f"In the 2012 to 2014 study corpus this pattern covered "
+                f"{ref['postings_in_study']} postings, of which "
+                f"{ref['fraud_rate_in_study']:.0%} were fraudulent. That is "
+                f"historical context, not a probability for this posting.")
+            # A callout, not a caption. This sentence is what keeps a pattern
+            # match from reading as a verdict, so it has to carry the same
+            # visual weight as the match itself.
+            st.info(f"**What this does not mean.** {archetype['caution']}")
+        else:
+            st.markdown(archetype['explanation'])
+
         model, tokenizer = load_model()
         with st.spinner('Analyzing...'):
             response = generate_response(model, tokenizer, posting_text)
@@ -406,13 +476,21 @@ if analyze_clicked:
         fabricated = check_grounding(response, posting_text)
         contradicted = check_claim_consistency(red_flags, posting_text)
         rule_flags = screen_posting_rules(posting_text)
-        overall = combine_signals(verdict, red_flags, rule_flags)
+        overall = combine_signals(verdict, red_flags, rule_flags, archetype)
 
         st.subheader('Result')
         if overall == 'DANGER':
-            st.error(
-                f'\U0001F6A8 High risk - the model flagged this as '
-                f'FRAUDULENT (confidence: {confidence})')
+            if archetype and archetype.get('basis') == 'campaign phrase':
+                st.error(
+                    f'\U0001F6A8 High risk - this posting reuses wording from '
+                    f'a known fraud campaign. That match sets this result on '
+                    f'its own. The language model read the posting as '
+                    f'{verdict} (confidence: {confidence}), which is the kind '
+                    f'of miss the phrase check exists to catch.')
+            else:
+                st.error(
+                    f'\U0001F6A8 High risk - the model flagged this as '
+                    f'FRAUDULENT (confidence: {confidence})')
         elif overall == 'CAUTION':
             if verdict == 'UNPARSEABLE':
                 st.warning(
@@ -439,28 +517,35 @@ if analyze_clicked:
         if red_flags:
             st.markdown('**Red flags the model cited:**')
             for flag in red_flags:
-                st.markdown(f'- {flag}')
+                st.markdown(f'- {md_safe(flag)}')
 
         if rule_flags:
             st.markdown('**Additional signals from the independent '
                          'rule-based check:**')
             for flag in rule_flags:
-                st.markdown(f'- {flag}')
+                st.markdown(f'- {md_safe(flag)}')
 
         if not red_flags and not rule_flags:
             st.markdown('Neither check found anything to flag in this posting.')
 
+        # These report the model contradicting the posting you pasted, which
+        # is the failure this app exists to catch. They render as warnings
+        # rather than captions so they cannot be read past.
         if fabricated:
-            st.caption(
-                f'⚠️ {len(fabricated)} quoted phrase(s) above could '
-                f'not be verified against the posting text and may be '
-                f'fabricated: {"; ".join(fabricated)}')
+            noun = 'quote' if len(fabricated) == 1 else 'quotes'
+            st.warning(
+                f'**Check this: {len(fabricated)} {noun} above did not come '
+                f'from your posting.** The model put wording in quotation '
+                f'marks that does not appear in the text you pasted, so '
+                f'ignore those quotes as evidence either way. '
+                f'{md_safe("; ".join(fabricated))}')
         if contradicted:
-            st.caption(
-                f'⚠️ {len(contradicted)} red flag(s) above claim '
-                f'something is missing from the posting that appears to '
-                f'actually be present - the model may have hallucinated '
-                f'this claim rather than checked the text.')
+            noun = 'reason' if len(contradicted) == 1 else 'reasons'
+            st.warning(
+                f'**Check this: {len(contradicted)} {noun} above may be '
+                f'wrong.** The model says something is missing from the '
+                f'posting, but it appears to actually be there. Read those '
+                f'reasons against the posting yourself before weighing them.')
 
         with st.expander('Raw model output'):
             st.text(response)
