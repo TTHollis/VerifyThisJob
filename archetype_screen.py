@@ -56,10 +56,14 @@ CAMPAIGN_SIGNATURES = (
 # measured optimum, and it has not been tuned against a false positive rate.
 BAIT_AD_MAX_WORDS = 150
 
-# Reasoned, not measured. The Bait Ad description in the source analysis notes
-# guaranteed wages spanning an implausible range, but the analysis never
-# operationalized it. This threshold was added during integration. Treat it as
-# the weakest signal here and see the project notebook for its hit rate.
+# Added during integration, then validated against the source corpus. The Bait
+# Ad description in the study notes guaranteed wages spanning an implausible
+# range but never operationalized it. At this ratio, 42 of 15,872 postings
+# (0.26%) match, and 21.4% of those are fraudulent against a 4.48% baseline,
+# a lift of 4.8. The sample is small: the 95% interval runs 11.7% to 35.9%,
+# and even its lower bound is 2.6 times baseline. This never fires on its own.
+# It is one offer marker among several, and the Bait Ad shape additionally
+# requires brevity and both absences.
 IMPLAUSIBLE_RANGE_RATIO = 3.0
 
 MIN_WORDS_TO_SCREEN = 5
