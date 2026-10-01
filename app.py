@@ -340,6 +340,28 @@ def md_safe(text):
 # Example postings
 EXAMPLE_POSTINGS = {
     'Select an example...': '',
+    'Known campaign: Administrative Assistant': (
+        'Title: Administrative Assistant\n'
+        'Location: Phoenix, AZ\n'
+        'Company profile: Our recruiters have redesigned the recruiting '
+        'wheel. We have partnered up in an effort to streamline placement '
+        'for professionals across a range of industries.\n'
+        'Description: We are leveraging your career goals to place you with '
+        'an employer who values what you bring. Represented candidates '
+        'receive priority consideration throughout the placement process.\n'
+        'Requirements: Two years of administrative experience, proficiency '
+        'with scheduling, correspondence and calendar management.\n'
+        'Benefits: Competitive salary, health coverage through the placing '
+        'employer, paid time off'
+    ),
+    'Bare bones: Package Processor': (
+        'Title: Package Processor - Remote\n'
+        'Location: Work from anywhere\n'
+        'Company profile: \n'
+        'Description: Work from home, no experience needed, start '
+        'immediately. Guaranteed pay of $600 to $4,500 weekly. Reply to be '
+        'considered.'
+    ),
     'Suspicious: Data Entry Clerk': (
         'Title: Data Entry Clerk - Remote\n'
         'Location: Work from home\n'
