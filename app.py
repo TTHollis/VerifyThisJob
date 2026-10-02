@@ -33,19 +33,35 @@ st.set_page_config(
 )
 
 
+@st.cache_data
+def encode_image(image_path):
+    """Read and base64-encode an image once rather than on every rerun.
+
+    The background is inlined as a data URI, so without this the file is read
+    and encoded again on every script run, including every button click.
+
+    Args:
+        image_path (str): Path to the image file.
+
+    Returns:
+        str: The file's contents, base64-encoded.
+    """
+    with open(image_path, 'rb') as f:
+        return base64.b64encode(f.read()).decode()
+
+
 def set_background(image_path):
     """Set the app's background image and float the content in a white card.
 
     Args:
         image_path (str): Path to the background image file.
     """
-    with open(image_path, 'rb') as f:
-        encoded = base64.b64encode(f.read()).decode()
+    encoded = encode_image(image_path)
 
     st.markdown(f'''
         <style>
         [data-testid="stAppViewContainer"] {{
-            background-image: url("data:image/png;base64,{encoded}");
+            background-image: url("data:image/webp;base64,{encoded}");
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -63,7 +79,7 @@ def set_background(image_path):
     ''', unsafe_allow_html=True)
 
 
-set_background('assets/background3.png')
+set_background('assets/background3.webp')
 
 
 @st.cache_resource(show_spinner='Loading the fine-tuned model...')
