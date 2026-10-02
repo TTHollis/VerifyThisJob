@@ -503,12 +503,23 @@ if analyze_clicked:
         st.subheader('Result')
         if overall == 'DANGER':
             if archetype and archetype.get('basis') == 'campaign phrase':
+                if verdict == 'LEGITIMATE':
+                    model_line = (
+                        f'The language model read the posting as LEGITIMATE '
+                        f'(confidence: {confidence}), which is the kind of '
+                        f'miss the phrase check exists to catch.')
+                elif verdict == 'FRAUDULENT':
+                    model_line = (
+                        f'The language model reached the same verdict '
+                        f'independently (confidence: {confidence}).')
+                else:
+                    model_line = (
+                        'The language model did not return a usable verdict, '
+                        'so the phrase match is carrying this result alone.')
                 st.error(
                     f'\U0001F6A8 High risk - this posting reuses wording from '
                     f'a known fraud campaign. That match sets this result on '
-                    f'its own. The language model read the posting as '
-                    f'{verdict} (confidence: {confidence}), which is the kind '
-                    f'of miss the phrase check exists to catch.')
+                    f'its own. {model_line}')
             else:
                 st.error(
                     f'\U0001F6A8 High risk - the model flagged this as '
@@ -555,12 +566,13 @@ if analyze_clicked:
         # rather than captions so they cannot be read past.
         if fabricated:
             noun = 'quote' if len(fabricated) == 1 else 'quotes'
+            quoted = '; '.join(f'"{q}"' for q in fabricated)
             st.warning(
                 f'**Check this: {len(fabricated)} {noun} above did not come '
                 f'from your posting.** The model put wording in quotation '
                 f'marks that does not appear in the text you pasted, so '
                 f'ignore those quotes as evidence either way. '
-                f'{md_safe("; ".join(fabricated))}')
+                f'Flagged: {md_safe(quoted)}')
         if contradicted:
             noun = 'reason' if len(contradicted) == 1 else 'reasons'
             st.warning(
